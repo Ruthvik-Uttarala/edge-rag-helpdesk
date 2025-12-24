@@ -106,14 +106,18 @@ function renderHome() {
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>EdgeRAG Helpdesk</title>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:32px;max-width:900px}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:32px;max-width:980px}
     textarea,input{width:100%;padding:10px;font-size:14px}
     button{padding:10px 14px;font-size:14px;cursor:pointer}
-    .row{display:flex;gap:12px;align-items:center}
-    .row > *{flex:1}
-    pre{background:#f6f8fa;padding:12px;border-radius:8px;overflow:auto}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .row > *{flex:1;min-width:240px}
     .card{border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-top:16px}
     .muted{color:#6b7280}
+    .answer{white-space:pre-wrap;line-height:1.4}
+    .src{border-top:1px solid #eee;padding-top:10px;margin-top:10px}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#f2f2f2;font-size:12px;margin-right:8px}
+    pre{background:#f6f8fa;padding:12px;border-radius:8px;overflow:auto}
+    .err{color:#b00020;white-space:pre-wrap}
   </style>
 </head>
 <body>
@@ -129,35 +133,87 @@ function renderHome() {
     <textarea id="q" rows="4" placeholder="Ask something..."></textarea>
     <p></p>
     <button id="ask">Ask</button>
+    <button id="toggleRaw" style="float:right;">Show raw JSON</button>
+    <span id="status" class="muted" style="margin-left:10px;"></span>
   </div>
 
   <div class="card">
-    <h3>Response</h3>
-    <pre id="out">—</pre>
+    <h3 style="margin-top:0;">Response</h3>
+    <div id="answer" class="answer">—</div>
+    <div id="sources"></div>
+    <pre id="raw" style="display:none;"></pre>
+    <div id="err" class="err"></div>
   </div>
 
 <script>
-  const out = document.getElementById('out');
-  document.getElementById('ask').onclick = async () => {
-    out.textContent = "Thinking...";
-    const question = document.getElementById('q').value;
-    const tenant = document.getElementById('tenant').value || undefined;
-    const topK = Number(document.getElementById('topk').value || 0) || undefined;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => (s ?? "").toString()
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
 
-    const resp = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {'content-type':'application/json'},
-      body: JSON.stringify({ question, tenant, topK })
-    });
+  let showRaw = false;
+  $("toggleRaw").onclick = () => {
+    showRaw = !showRaw;
+    $("raw").style.display = showRaw ? "block" : "none";
+    $("toggleRaw").textContent = showRaw ? "Hide raw JSON" : "Show raw JSON";
+  };
 
-    out.textContent = await resp.text();
+  $("ask").onclick = async () => {
+    $("err").textContent = "";
+    $("sources").innerHTML = "";
+    $("status").textContent = "Calling /api/chat...";
+    $("answer").textContent = "Thinking...";
+
+    const question = $("q").value.trim();
+    const tenant = ($("tenant").value.trim() || "public");
+    const topK = Number($("topk").value.trim() || "6") || 6;
+
+    try {
+      const resp = await fetch("/api/chat", {
+        method: "POST",
+        headers: {"content-type":"application/json"},
+        body: JSON.stringify({ question, tenant, topK })
+      });
+
+      const data = await resp.json();
+      $("raw").textContent = JSON.stringify(data, null, 2);
+
+      if (!resp.ok) {
+        $("answer").textContent = "Error";
+        $("err").textContent = data?.error ? String(data.error) : "Request failed";
+        $("status").textContent = "";
+        return;
+      }
+
+      $("answer").textContent = data.answer || "(no answer)";
+      const used = data.usedSources || [];
+
+      if (used.length) {
+        $("sources").innerHTML = "<h4>Sources</h4>";
+        for (const s of used) {
+          const div = document.createElement("div");
+          div.className = "src";
+          div.innerHTML =
+            "<div><span class='pill'>" + esc(s.ref || "S?") + "</span><b>" + esc(s.source || "") + "</b></div>" +
+            "<div class='muted'>chunk " + esc(s.chunk) + " · score " + esc((s.score ?? "").toString()) + "</div>" +
+            (s.text ? "<div style='margin-top:8px;white-space:pre-wrap;'>" + esc(s.text) + "</div>" : "");
+          $("sources").appendChild(div);
+        }
+      } else {
+        $("sources").innerHTML = "<h4>Sources</h4><div class='muted'>No sources returned.</div>";
+      }
+
+      $("status").textContent = "OK";
+    } catch (e) {
+      $("answer").textContent = "Error";
+      $("err").textContent = String(e);
+      $("status").textContent = "";
+    }
   };
 </script>
 </body>
 </html>`;
   return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
 }
-
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
@@ -285,15 +341,18 @@ export default {
         ) as any;
 
         return cors(json({
-          answer: response?.response ?? response,
+          answer: (response?.response ?? response?.result ?? response)?.toString?.() ?? String(response),
+
           tenant,
           usedSources: picked.map((s) => ({
-            ref: `S${s.rank}`,
-            source: s.source,
-            chunk: s.chunk,
-            id: s.id,
-            score: s.score
-          })),
+  ref: `S${s.rank}`,
+  source: s.source,
+  chunk: s.chunk,
+  id: s.id,
+  score: s.score,
+  text: (s.text || "").slice(0, 600)
+})),
+
           aiGatewayLogId: env.AI.aiGatewayLogId ?? null
         }));
       }
