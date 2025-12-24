@@ -2,3 +2,7 @@ node_modules/
 .wrangler/
 .env
 *.log
+
+
+sample.txt
+chat-output.txt

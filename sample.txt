@@ -1,3 +1,0 @@
-﻿My project docs:
-
-This system ingests text and answers with sources.
