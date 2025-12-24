@@ -1,0 +1,18 @@
+name = "edge-rag-helpdesk"
+main = "src/index.ts"
+compatibility_date = "2025-12-01"
+
+[ai]
+binding = "AI"
+remote = true
+
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "edge-rag-docs"
+# NOTE: Vectorize doesn't truly run locally; remote mode uses the real index.
+
+[vars]
+AI_GATEWAY_ID = "edge-rag-gw"
+DEFAULT_TENANT = "public"
+TOP_K = "6"
+MAX_CONTEXT_CHARS = "8000"
