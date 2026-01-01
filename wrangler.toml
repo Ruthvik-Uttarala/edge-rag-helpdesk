@@ -4,11 +4,12 @@ compatibility_date = "2025-12-01"
 
 [ai]
 binding = "AI"
-remote = true
+
 
 [[vectorize]]
 binding = "VECTORIZE"
 index_name = "edge-rag-docs"
+remote = true
 # NOTE: Vectorize doesn't truly run locally; remote mode uses the real index.
 
 [vars]

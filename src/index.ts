@@ -1,3 +1,4 @@
+/// <reference types="@cloudflare/workers-types" />
 export interface Env {
   AI: Ai;
   VECTORIZE: VectorizeIndex;
@@ -106,68 +107,327 @@ function renderHome() {
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>EdgeRAG Helpdesk</title>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:32px;max-width:980px}
-    textarea,input{width:100%;padding:10px;font-size:14px}
-    button{padding:10px 14px;font-size:14px;cursor:pointer}
-    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-    .row > *{flex:1;min-width:240px}
-    .card{border:1px solid #e5e7eb;border-radius:10px;padding:14px;margin-top:16px}
-    .muted{color:#6b7280}
-    .answer{white-space:pre-wrap;line-height:1.4}
-    .src{border-top:1px solid #eee;padding-top:10px;margin-top:10px}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#f2f2f2;font-size:12px;margin-right:8px}
-    pre{background:#f6f8fa;padding:12px;border-radius:8px;overflow:auto}
-    .err{color:#b00020;white-space:pre-wrap}
+    :root{
+      --bg:#0b1020;
+      --card:#111a33;
+      --muted:#9aa4bf;
+      --text:#eaf0ff;
+      --line:rgba(255,255,255,.10);
+      --brand:#7c5cff;
+      --brand2:#25d7ff;
+      --good:#3ddc97;
+      --warn:#ffcc66;
+      --bad:#ff5c7a;
+      --shadow:0 20px 60px rgba(0,0,0,.35);
+      --radius:16px;
+    }
+    @media (prefers-color-scheme: light){
+      :root{
+        --bg:#f6f7fb;
+        --card:#ffffff;
+        --muted:#5b647a;
+        --text:#0d1326;
+        --line:rgba(10,18,38,.10);
+        --shadow:0 20px 50px rgba(16,24,40,.12);
+      }
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:
+        radial-gradient(1200px 600px at 20% -10%, rgba(124,92,255,.25), transparent 60%),
+        radial-gradient(900px 500px at 90% 0%, rgba(37,215,255,.18), transparent 55%),
+        var(--bg);
+      color:var(--text);
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:28px 18px 50px}
+    .topbar{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,var(--brand),var(--brand2));box-shadow:var(--shadow)}
+    h1{font-size:24px;margin:0}
+    .sub{color:var(--muted);margin:3px 0 0;font-size:14px}
+    .pill{font-size:12px;color:var(--muted);border:1px solid var(--line);padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.04)}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:960px){.grid{grid-template-columns:420px 1fr;align-items:start}}
+    .card{
+      background: rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .card-h{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .card-b{padding:14px 16px}
+    .label{font-size:12px;color:var(--muted);margin:0 0 6px}
+    input,textarea{
+      width:100%;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      padding:12px 12px;
+      outline:none;
+      font-size:14px;
+    }
+    textarea{min-height:140px;resize:vertical;line-height:1.35}
+    input::placeholder,textarea::placeholder{color:rgba(154,164,191,.85)}
+    .row{display:grid;grid-template-columns:1fr;gap:10px}
+    @media(min-width:540px){.row{grid-template-columns:1fr 1fr}}
+    .rangeRow{display:flex;align-items:center;gap:10px}
+    input[type="range"]{padding:0;height:32px;background:transparent;border:none}
+    .kbadge{min-width:44px;text-align:center;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:rgba(255,255,255,.06)}
+    .btnRow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    button{
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      border-radius:12px;
+      padding:10px 12px;
+      cursor:pointer;
+      font-size:14px;
+      transition:transform .05s ease, background .2s ease;
+    }
+    button:hover{background:rgba(255,255,255,.10)}
+    button:active{transform:translateY(1px)}
+    .primary{border:none;background:linear-gradient(135deg,var(--brand),var(--brand2));color:#071021;font-weight:800}
+    .ghost{background:transparent}
+    .muted{color:var(--muted)}
+    .tiny{font-size:12px}
+    .examples{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .ex{font-size:12px;padding:8px 10px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.05)}
+    .status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+    .dot{width:8px;height:8px;border-radius:999px;background:var(--muted);opacity:.85}
+    .dot.live{background:var(--good)}
+    .dot.wait{background:var(--warn)}
+    .dot.bad{background:var(--bad)}
+    .answer{line-height:1.55;font-size:14px}
+    .answer b{font-weight:800}
+    .answer ul{margin:8px 0 12px 18px}
+    .answer li{margin:5px 0}
+    .answer .secTitle{margin:14px 0 8px;font-weight:900;font-size:13px;letter-spacing:.2px}
+    .srcCard{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:10px 0;background:rgba(255,255,255,.04)}
+    .srcTop{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .badge{display:inline-block;font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.06)}
+    .srcText{white-space:pre-wrap;margin-top:8px;color:rgba(234,240,255,.90);font-size:13px}
+    pre{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:12px;padding:12px;overflow:auto}
+    details{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
+    summary{cursor:pointer;color:var(--muted);font-size:13px}
+    .err{color:var(--bad);white-space:pre-wrap;font-size:13px;margin-top:10px}
   </style>
 </head>
 <body>
-  <h1>EdgeRAG Helpdesk</h1>
-  <p class="muted">Ask questions over ingested docs. Answers include sources.</p>
-
-  <div class="card">
-    <div class="row">
-      <input id="tenant" placeholder="tenant (default: public)" />
-      <input id="topk" placeholder="topK (default: 6)" />
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>EdgeRAG Helpdesk</h1>
+          <div class="sub">Edge-deployed RAG for SRE runbooks (Cloudflare Workers AI + Vectorize + AI Gateway)</div>
+        </div>
+      </div>
+      <div class="pill">Tip: Press <b>Ctrl + Enter</b> to ask</div>
     </div>
-    <p></p>
-    <textarea id="q" rows="4" placeholder="Ask something..."></textarea>
-    <p></p>
-    <button id="ask">Ask</button>
-    <button id="toggleRaw" style="float:right;">Show raw JSON</button>
-    <span id="status" class="muted" style="margin-left:10px;"></span>
-  </div>
 
-  <div class="card">
-    <h3 style="margin-top:0;">Response</h3>
-    <div id="answer" class="answer">—</div>
-    <div id="sources"></div>
-    <pre id="raw" style="display:none;"></pre>
-    <div id="err" class="err"></div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-h">
+          <div>
+            <div style="font-weight:900;">Ask a question</div>
+            <div class="tiny muted">Tune retrieval + scope with tenant and topK.</div>
+          </div>
+          <div class="status">
+            <span class="dot" id="dot"></span>
+            <span id="statusText">Idle</span>
+          </div>
+        </div>
+        <div class="card-b">
+          <div class="row">
+            <div>
+              <div class="label">Tenant</div>
+              <input id="tenant" placeholder="public (or demo-sre)" />
+              <div class="tiny muted" style="margin-top:6px;">Use <b>demo-sre</b> to query the runbook pack.</div>
+            </div>
+
+            <div>
+              <div class="label">topK</div>
+              <div class="rangeRow">
+                <input id="topk" type="range" min="1" max="12" value="6" />
+                <div class="kbadge" id="kbadge">6</div>
+              </div>
+              <div class="tiny muted" style="margin-top:6px;">Higher = more context, higher cost. Default 6 is good.</div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <div class="label">Question</div>
+            <textarea id="q" placeholder="Example: 5xx rate is above 1%. Give a step-by-step triage and safest mitigation."></textarea>
+          </div>
+
+          <div class="btnRow" style="margin-top:12px;">
+            <button class="primary" id="ask">Ask</button>
+            <button class="ghost" id="copy" disabled>Copy answer</button>
+            <button class="ghost" id="toggleRaw">Show raw JSON</button>
+            <span class="tiny muted" id="latency"></span>
+          </div>
+
+          <div class="examples">
+            <button class="ex" data-ex="lat">p95 checkout latency &gt; 250ms</button>
+            <button class="ex" data-ex="5xx">5xx error rate &gt; 1%</button>
+            <button class="ex" data-ex="comms">Write a SEV2 status update</button>
+            <button class="ex" data-ex="sec">How to handle ingest token</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">
+          <div style="font-weight:900;">Response</div>
+          <div class="tiny muted">Grounded in retrieved sources</div>
+        </div>
+        <div class="card-b">
+          <div id="answer" class="answer muted">Ask a question to see results.</div>
+
+          <details id="sourcesWrap">
+            <summary>Sources</summary>
+            <div id="sources"></div>
+          </details>
+
+          <details id="rawWrap" style="display:none;">
+            <summary>Raw JSON</summary>
+            <pre id="raw"></pre>
+          </details>
+
+          <div id="err" class="err"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
 <script>
+(function(){
   const $ = (id) => document.getElementById(id);
-  const esc = (s) => (s ?? "").toString()
-    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+
+  function esc(v){
+    return (v ?? "").toString()
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;");
+  }
+
+  function setStatus(kind, text){
+    const dot = $("dot");
+    dot.className = "dot" + (kind ? (" " + kind) : "");
+    $("statusText").textContent = text;
+  }
+
+  function mdToHtml(input){
+    let s = esc(input || "");
+    // bold **x**
+    s = s.replace(/\\*\\*(.+?)\\*\\*/g, "<b>$1</b>");
+
+    // bullets: lines starting with "- "
+    const lines = s.split("\\n");
+    let out = "";
+    let inList = false;
+    for (const line of lines){
+      const m = line.match(/^\\s*-\\s+(.*)$/);
+      if (m){
+        if (!inList){ out += "<ul>"; inList = true; }
+        out += "<li>" + m[1] + "</li>";
+      } else {
+        if (inList){ out += "</ul>"; inList = false; }
+        out += line ? (line + "<br/>") : "<br/>";
+      }
+    }
+    if (inList) out += "</ul>";
+    return out;
+  }
+
+  function renderStructured(st){
+    if (!st || typeof st !== "object") return "";
+    const summary = st.summary ? "<div class='secTitle'>Summary</div><div>" + mdToHtml(String(st.summary)) + "</div>" : "";
+    const arr = (title, items) => {
+      if (!Array.isArray(items) || !items.length) return "";
+      let h = "<div class='secTitle'>" + esc(title) + "</div><ul>";
+      for (const it of items) h += "<li>" + mdToHtml(String(it)).replaceAll("<br/>","") + "</li>";
+      h += "</ul>";
+      return h;
+    };
+    const cits = Array.isArray(st.citations) && st.citations.length
+      ? "<div class='secTitle'>Citations</div><div class='muted tiny'>" + esc(st.citations.join(", ")) + "</div>"
+      : "";
+    return summary + arr("Triage", st.triage) + arr("Mitigations", st.mitigations) + arr("Don't do", st.dont) + cits;
+  }
+
+  $("topk").addEventListener("input", () => $("kbadge").textContent = $("topk").value);
+
+  document.querySelectorAll("[data-ex]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      $("tenant").value = ($("tenant").value.trim() || "demo-sre");
+      const ex = btn.getAttribute("data-ex");
+      const map = {
+        lat: "We have p95 checkout latency > 250ms. What are the first 3 things to check and the safest mitigation?",
+        "5xx": "5xx rate is above 1%. Give a step-by-step triage and what NOT to do.",
+        comms: "Write a SEV2 status update using the incident comms template for checkout latency in us-east.",
+        sec: "How should we handle the ingestion token securely? Include rotation guidance."
+      };
+      $("q").value = map[ex] || "";
+      $("q").focus();
+    });
+  });
 
   let showRaw = false;
-  $("toggleRaw").onclick = () => {
+  $("toggleRaw").addEventListener("click", () => {
     showRaw = !showRaw;
-    $("raw").style.display = showRaw ? "block" : "none";
+    $("rawWrap").style.display = showRaw ? "block" : "none";
     $("toggleRaw").textContent = showRaw ? "Hide raw JSON" : "Show raw JSON";
-  };
+  });
 
-  $("ask").onclick = async () => {
+  async function copyText(text){
+    try{
+      await navigator.clipboard.writeText(text);
+      return true;
+    }catch(_){
+      // fallback
+      try{
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        return true;
+      }catch(e){
+        return false;
+      }
+    }
+  }
+
+  async function ask(){
     $("err").textContent = "";
     $("sources").innerHTML = "";
-    $("status").textContent = "Calling /api/chat...";
-    $("answer").textContent = "Thinking...";
+    $("sourcesWrap").open = false;
+    $("answer").classList.remove("muted");
+    $("answer").innerHTML = "<span class='muted'>Thinking...</span>";
+    $("copy").disabled = true;
+
+    setStatus("wait", "Calling /api/chat...");
+    $("latency").textContent = "";
 
     const question = $("q").value.trim();
     const tenant = ($("tenant").value.trim() || "public");
-    const topK = Number($("topk").value.trim() || "6") || 6;
+    const topK = Number($("topk").value || 6);
 
-    try {
+    if (!question){
+      setStatus("bad", "Error");
+      $("answer").innerHTML = "<b>Error</b>";
+      $("err").textContent = "Please enter a question.";
+      return;
+    }
+
+    const t0 = performance.now();
+    try{
       const resp = await fetch("/api/chat", {
         method: "POST",
         headers: {"content-type":"application/json"},
@@ -177,47 +437,81 @@ function renderHome() {
       const data = await resp.json();
       $("raw").textContent = JSON.stringify(data, null, 2);
 
-      if (!resp.ok) {
-        $("answer").textContent = "Error";
-        $("err").textContent = data?.error ? String(data.error) : "Request failed";
-        $("status").textContent = "";
+      $("latency").textContent = Math.round(performance.now() - t0) + " ms";
+
+      if (!resp.ok){
+        setStatus("bad", "Error");
+        $("answer").innerHTML = "<b>Error</b>";
+        $("err").textContent = data && data.error ? String(data.error) : "Request failed";
         return;
       }
 
-      const a = data.answer || "(no answer)";
-$("answer").innerHTML = esc(a)
-  .replaceAll(/\\*\\*(.+?)\\*\\*/g, "<b>$1</b>")
-  .replaceAll("\\n", "<br/>");
+      setStatus("live", "OK");
 
-      const used = data.usedSources || [];
+      const structuredHtml = renderStructured(data.structured);
+      if (structuredHtml){
+        $("answer").innerHTML = structuredHtml;
+      } else {
+        $("answer").innerHTML = mdToHtml(data.answer || "(no answer)");
+      }
 
-      if (used.length) {
-        $("sources").innerHTML = "<h4>Sources</h4>";
-        for (const s of used) {
+      // Copy
+      $("copy").disabled = false;
+      $("copy").onclick = async () => {
+        const ok = await copyText(String((data.structured && data.structured.summary) ? data.structured.summary : (data.answer || "")));
+        $("copy").textContent = ok ? "Copied!" : "Copy failed";
+        setTimeout(()=> $("copy").textContent = "Copy answer", 900);
+      };
+
+      // Sources
+      const used = Array.isArray(data.usedSources) ? data.usedSources : [];
+      if (used.length){
+        $("sourcesWrap").open = true;
+        for (const s of used){
           const div = document.createElement("div");
-          div.className = "src";
+          div.className = "srcCard";
           div.innerHTML =
-            "<div><span class='pill'>" + esc(s.ref || "S?") + "</span><b>" + esc(s.source || "") + "</b></div>" +
-            "<div class='muted'>chunk " + esc(s.chunk) + " · score " + esc((s.score ?? "").toString()) + "</div>" +
-            (s.text ? "<div style='margin-top:8px;white-space:pre-wrap;'>" + esc(s.text) + "</div>" : "");
+            "<div class='srcTop'>" +
+              "<div style='display:flex;gap:8px;flex-wrap:wrap;align-items:center;'>" +
+                "<span class='badge'><b>" + esc(s.ref || "S?") + "</b></span>" +
+                "<span class='badge'>" + esc(s.source || "unknown") + "</span>" +
+                "<span class='badge'>chunk " + esc(s.chunk) + "</span>" +
+              "</div>" +
+              "<div class='tiny muted'>score " + esc((s.score ?? "").toString()) + "</div>" +
+            "</div>" +
+            (s.text ? "<div class='srcText'>" + esc(s.text) + "</div>" : "");
           $("sources").appendChild(div);
         }
       } else {
-        $("sources").innerHTML = "<h4>Sources</h4><div class='muted'>No sources returned.</div>";
+        $("sources").innerHTML = "<div class='tiny muted'>No sources returned.</div>";
       }
-
-      $("status").textContent = "OK";
-    } catch (e) {
-      $("answer").textContent = "Error";
+    }catch(e){
+      setStatus("bad", "Error");
+      $("answer").innerHTML = "<b>Error</b>";
       $("err").textContent = String(e);
-      $("status").textContent = "";
     }
-  };
+  }
+
+  $("ask").addEventListener("click", ask);
+  $("q").addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.key === "Enter") ask();
+  });
+
+  window.addEventListener("error", (ev) => {
+    // If your script was dying before, you'll see it now in the UI too
+    $("err").textContent = "UI error: " + (ev.message || "unknown error");
+    setStatus("bad", "UI error");
+  });
+
+  setStatus("", "Idle");
+})();
 </script>
 </body>
 </html>`;
-  return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
+ return new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } });
 }
+
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
@@ -326,41 +620,65 @@ export default {
         }
 
 const system = [
-  "You are an SRE/Incident Response copilot answering questions using ONLY the provided sources.",
+  "You are an SRE/Incident Response copilot.",
+  "You MUST answer using ONLY the provided Sources.",
+  "",
+  "Output MUST be valid JSON only (no markdown, no extra text).",
+  "Schema:",
+  "{",
+  '  "summary": string,',
+  '  "triage": string[],',
+  '  "mitigations": string[],',
+  '  "dont": string[],',
+  '  "citations": string[]  // like ["S1","S2"]',
+  "}",
+  "",
   "Rules:",
-  "1) If the sources contain enough info, answer confidently using ONLY those facts.",
-  "2) If the sources do NOT contain enough info, say: 'Not enough information in the provided sources.' (and do NOT add extra guesses).",
-  "3) Never write 'Do not know' repeatedly. Say it at most once, as a single sentence.",
-  "4) End the answer with citations like [S1], [S2].",
-  "5) Keep it short and actionable (bullets preferred)."
+  "- If Sources are insufficient, set summary to 'Not enough information in the provided sources.'",
+  "- Keep arrays short and actionable (3-6 items).",
+  "- citations must reference the Sources you used."
 ].join("\n");
 
+
         const response = await env.AI.run(
-          CHAT_MODEL,
-          {
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: `Question: ${question}\n\nSources:\n${ctx}\n\nAnswer:` }
-            ]
-          },
-          { gateway: { id: env.AI_GATEWAY_ID } }
-        ) as any;
+  CHAT_MODEL,
+  {
+    temperature: 0.2,
+    max_tokens: 700,
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: `Question: ${question}\n\nSources:\n${ctx}\n\nReturn JSON:` }
+    ]
+  },
+  { gateway: { id: env.AI_GATEWAY_ID } }
+) as any;
+
+
+const raw = (response?.response ?? response)?.toString?.() ?? String(response);
+
+let structured: any = null;
+try {
+  structured = JSON.parse(raw);
+} catch {
+  structured = null;
+}
+
+
 
         return cors(json({
-          answer: (response?.response ?? response?.result ?? response)?.toString?.() ?? String(response),
-
-          tenant,
-          usedSources: picked.map((s) => ({
-  ref: `S${s.rank}`,
-  source: s.source,
-  chunk: s.chunk,
-  id: s.id,
-  score: s.score,
-  text: (s.text || "").slice(0, 600)
-})),
-
-          aiGatewayLogId: env.AI.aiGatewayLogId ?? null
-        }));
+  answer: structured?.summary ?? raw,
+  structured,
+  tenant,
+  usedSources: picked.map((s) => ({
+    ref: `S${s.rank}`,
+    source: s.source,
+    chunk: s.chunk,
+    id: s.id,
+    score: s.score,
+    text: (s.text || "").slice(0, 600)
+  })),
+  aiGatewayLogId: env.AI.aiGatewayLogId ?? null
+}));
       }
 
       return cors(json({ error: "Not found" }, { status: 404 }));
